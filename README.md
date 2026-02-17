@@ -1,357 +1,485 @@
 # 🐸 SymFrog-512
 
-## High-Capacity Sponge-Based AEAD Cipher with 1024-bit Internal State
+## High-Capacity Sponge-Based AEAD Cipher (1024-bit State)
 
-```{=html}
 <p align="center">
-```
-`<img src="assets/logo.png" width="320" alt="SymFrog-512 Logo">`{=html}
-```{=html}
+  <img src="assets/logo.png" width="320" alt="SymFrog-512 Logo">
 </p>
+
+<p align="center">
+  <b>SymFrog-512</b> is a sponge-duplex authenticated encryption design built around a 1024-bit internal state, engineered for conservative margins, file safety, and practical usability.
+</p>
+
+<p align="center">
+  <a href="https://github.com/victormeloasm/symfrog512/releases/tag/v1.0">Release v1.0</a>
+  ·
+  <a href="#-download">Download</a>
+  ·
+  <a href="#-build">Build</a>
+  ·
+  <a href="#-usage">Usage</a>
+  ·
+  <a href="#-security-model--claims">Security</a>
+</p>
+
+---
+
+## ⭐ Highlights
+
+* 🔐 **AEAD (Authenticated Encryption with Associated Data)** for files and streams
+* 🧽 **Sponge Duplex** with **1024-bit state** (rate 512, capacity 512)
+* 🏷️ **256-bit authentication tag**
+* 🧂 **Salt + Argon2id** password-based key derivation mode
+* 🔑 **Raw-key mode** for high-entropy keys
+* 🧾 **Authenticated header** to protect metadata integrity before decrypting
+* 💾 **Atomic, crash-safe file writes** (tmp → fsync → rename)
+* 🧠 **Secure memory handling** (`sodium_mlock`, explicit zeroization)
+* 🧪 **`--test-all`** suite with boundary, tamper, truncation and large-size coverage
+* 🐍 Optional offline inspection tooling (header + structure validation)
+
+---
+
+# 📦 Download
+
+✅ Prebuilt Linux x86_64 binary release:
+
+**[https://github.com/victormeloasm/symfrog512/releases/download/v1.0/symfrog512-linux-x86_64.tar.gz](https://github.com/victormeloasm/symfrog512/releases/download/v1.0/symfrog512-linux-x86_64.tar.gz)**
+
+Extract:
+
+```bash
+tar -xzf symfrog512-linux-x86_64.tar.gz
+chmod +x symfrog512
+./symfrog512 --help
 ```
-SymFrog-512 is a high-capacity sponge duplex authenticated encryption
-design built around a 1024-bit internal state. It is engineered with
-conservative structural margins, authenticated metadata handling, atomic
-file durability, and memory-safe practices.
 
-This project provides a reference implementation written in modern C++
-and is intended for research, experimentation, and high-assurance file
-encryption scenarios.
+---
 
-Repository\
-https://github.com/victormeloasm/symfrog512
+# 🧠 What SymFrog-512 Is (and Is Not)
 
-Binary Release\
-https://github.com/victormeloasm/symfrog512/releases/download/v1.0/symfrog512-linux-x86_64.tar.gz
+SymFrog-512 is a **research-grade** cipher implementation focusing on:
 
-License\
-MIT
+* large internal state
+* conservative separation of rate/capacity
+* authenticated file format
+* durable file writes
+* clarity and reproducibility
 
-# Table of Contents
+It is not a standardized primitive (like AES-GCM or ChaCha20-Poly1305).
+It is meant for research, experimentation, and transparent engineering.
 
-1.  Overview\
-2.  Design Philosophy\
-3.  Architecture\
-4.  Security Model and Claims\
-5.  Permutation Core P1024\
-6.  AEAD Construction\
-7.  File Format Specification\
-8.  Key Handling Modes\
-9.  Nonce Requirements\
-10. Memory Hardening\
-11. Atomic File Safety\
-12. Build Instructions\
-13. Usage Guide\
-14. Test Suite\
-15. Structural Validation Tool\
-16. Threat Model\
-17. Cryptographic Rationale\
-18. Performance\
-19. FAQ\
-20. Roadmap\
-21. License
+---
 
-# 1. Overview
+# 🧽 Design Overview
 
-SymFrog-512 is a sponge-based authenticated encryption construction
-using a 1024-bit internal state partitioned into:
+## Sponge Duplex Construction
 
--   512-bit rate\
--   512-bit capacity
+SymFrog-512 uses a duplex sponge approach:
 
-The construction follows a duplex model where associated data,
-plaintext, and finalization phases are domain separated and
-cryptographically bound.
+* data is absorbed into the state
+* state is permuted
+* output keystream/tag is derived from the state
 
-Primary objectives:
+The internal state is split into two conceptual parts:
 
--   Conservative structural margin\
--   Clear authenticated file format\
--   Deterministic reproducibility\
--   Crash-safe file handling\
--   Explicit secure memory practices
+* **Rate (r)**: the part that interacts with plaintext/ciphertext and AD
+* **Capacity (c)**: the hidden security margin that is never directly exposed
 
-# 2. Design Philosophy
+### Parameters
 
-SymFrog-512 prioritizes:
+* **State size**: 1024 bits
+* **Rate**: 512 bits
+* **Capacity**: 512 bits
+* **Rounds**: 24
+* **Nonce**: 256 bits
+* **Tag**: 256 bits
 
--   Large internal state for structural safety margin\
--   Separation between rate and capacity domains\
--   Authenticated metadata before decryption\
--   Memory-hard password derivation\
--   Minimal implicit behavior\
--   Transparent and inspectable format
+---
 
-It does not claim standardization. It is a research-grade implementation
-intended for evaluation and experimentation.
+# 🔐 Security Model & Claims
 
-# 3. Architecture
-
-Internal parameters:
-
--   State size: 1024 bits\
--   Rate: 512 bits\
--   Capacity: 512 bits\
--   Rounds: 24\
--   Nonce: 256 bits\
--   Tag: 256 bits
-
-The duplex sponge model operates as:
-
-Absorb Key\
-Absorb Associated Data\
-Encrypt or Decrypt Stream\
-Finalize and Produce Tag
-
-The capacity portion of the state is never directly exposed.
-
-# 4. Security Model and Claims
+## Practical security level
 
 SymFrog-512 targets:
 
--   Up to 256-bit effective security against generic AEAD forgery\
--   Up to 256-bit confidentiality under ideal permutation assumption\
--   2\^256 forgery bound from tag size
+* **Up to 256-bit effective security** against generic AEAD forgery and confidentiality attacks
+* **2⁻²⁵⁶** generic forgery probability from a 256-bit tag (best-case bound)
 
-Important clarification:
+### Why not “512-bit real security”?
 
-Even though capacity is 512 bits, AEAD security is bounded by the
-256-bit tag and generic attack models.
+Even with 512-bit capacity, **AEAD security is bounded by the tag size** and generic birthday-style limits in realistic attack models.
 
-SymFrog-512 does not claim formal proof. Security relies on:
+So the honest, paper-grade claim is:
 
--   Structural sponge assumptions\
--   Absence of exploitable differential structure\
--   Nonce uniqueness\
--   Proper key management
+* **Confidentiality and authenticity target: 256-bit**, assuming the permutation behaves as a secure PRP and nonces are not reused with the same key.
 
-# 5. Permutation Core P1024
+This is already far beyond conventional deployment needs (AES-256 is generally “enough for the universe”).
 
-The P1024 permutation runs for 24 structured rounds.
+---
 
-Each round includes:
+# 🧱 P1024 Permutation Engine
 
--   Deterministic round constants derived from SHAKE256\
--   Full-width linear diffusion\
--   Non-linear bitslice mixing\
--   Symmetry breaking operations\
--   Fixed rotations\
--   Global word shuffle
+SymFrog-512’s core permutation runs for **24 rounds**.
 
-Design goal is avalanche across the full 1024-bit state within a minimal
-number of rounds.
+Each round is structured to provide:
 
-# 6. AEAD Construction
+* high diffusion across the entire 1024-bit state
+* strong non-linearity
+* symmetry breaking
+* avoidance of trivial invariants
+* deterministic, reproducible constants
 
-SymFrog-512 implements Authenticated Encryption with Associated Data.
+### Round constants
 
-Properties:
+Round constants are derived deterministically via SHAKE256 to prevent:
 
--   Associated data authenticated but not encrypted\
--   Header authenticated independently\
--   Strict internal padding rule 10\*1\
--   No padding expansion visible in ciphertext file
+* weak constants
+* accidental symmetry
+* hidden “handpicked” constants concerns
 
-Decryption verifies authentication before releasing plaintext.
+---
 
-# 7. File Format Specification
+# 🧾 File Format (On-Disk)
 
-High-level structure:
+SymFrog-512 stores ciphertexts in a file container with an authenticated header.
 
-Header\
-Ciphertext\
-Final Tag
+### High-level structure
 
-Header contains:
+```
++----------------------------+
+| Header (fixed size)        |
+|  magic, version, flags     |
+|  salt (optional)           |
+|  nonce                     |
+|  ct_len                    |
+|  reserved                  |
+|  header_tag (256-bit)      |
++----------------------------+
+| Ciphertext (ct_len bytes)  |
++----------------------------+
+| Final Tag (256-bit)        |
++----------------------------+
+```
 
--   Magic identifier\
--   Version\
--   Flags\
--   Salt when in password mode\
--   Nonce\
--   Ciphertext length\
--   Reserved fields\
--   Header authentication tag
+### Why an authenticated header?
 
-Final 256-bit tag authenticates full encryption session.
+It prevents attacks where an adversary modifies metadata (nonce, salt, flags, length, version) to force:
 
-# 8. Key Handling Modes
+* undefined behavior
+* oracle-like error leaks
+* confusion about parameters
+* downgrade or cross-file substitution
 
-Password Mode:
+In SymFrog, the header is cryptographically bound before decryption proceeds.
 
--   Argon2id memory-hard derivation\
--   Salt stored in header\
--   Mitigates offline brute force
+---
 
-Raw Key Mode:
+# 🧷 Associated Data (AD)
 
--   Direct high-entropy key input\
--   Intended for automation and controlled environments
+Associated Data is authenticated but not encrypted.
 
-Sensitive buffers:
+Use cases:
 
--   Locked using sodium_mlock\
--   Wiped via secure zeroization
+* filenames
+* protocol metadata
+* file-type identifiers
+* user IDs
+* structured context
 
-# 9. Nonce Requirements
+If AD changes, decryption must fail.
 
-Nonce must be unique per encryption under the same key.
+---
 
-Failure to enforce nonce uniqueness can compromise confidentiality in
-stream-like constructions.
+# 🔑 Key Modes & Guidance
 
-Tests may use deterministic nonce for reproducibility.
+SymFrog supports:
 
-# 10. Memory Hardening
+## Password mode (Argon2id)
 
-Security practices:
+* Designed for human passphrases
+* Uses a salt stored in the header
+* Provides memory-hard defense against offline guessing
 
--   sodium_mlock to prevent swapping\
--   Explicit secure buffer wiping\
--   No secret material left in heap memory\
--   Controlled buffer lifetime
+✅ Best for usability.
 
-# 11. Atomic File Safety
+## Raw-key mode
 
-Encryption writes:
+* For high-entropy keys (generated, not typed)
+* Useful for automation, CI, or key vaults
+* Avoids KDF cost
 
-Temporary file\
-fsync\
-Atomic rename
+✅ Best for controlled environments.
 
-Prevents:
+---
 
--   Partial writes\
--   Corrupted outputs on crash\
--   Power-loss inconsistencies
+# 🧨 Nonce Guidance (Important)
 
-# 12. Build Instructions
+Nonce must be **unique per encryption under the same key**.
 
-Dependencies:
+* Password mode: salts differ per file, which reduces same-key reuse risk, but you still should not intentionally reuse nonce with identical derived keys.
+* Raw-key mode: treat nonce uniqueness as mandatory.
 
--   libsodium\
--   OpenSSL\
--   Clang or GCC supporting C++20
+The test harness may use deterministic nonce values (for reproducibility).
+That is normal in tests, not in production usage.
 
-Ubuntu:
+---
 
-sudo apt install libsodium-dev libssl-dev clang lld
+# 💾 Atomic File Safety & Reliability
 
-Build:
+Encryption output is written using a safe sequence:
 
-clang++ -std=c++20 -O3 -march=native -mtune=native -flto -fuse-ld=lld\
-symfrog512.cpp -o symfrog512\
--lsodium -lssl -lcrypto
+1. write to temp file in the destination directory
+2. flush with `fsync`
+3. atomically rename to final filename
 
-# 13. Usage Guide
+This prevents:
 
-Check help:
+* corrupted ciphertext on crash/power loss
+* half-written outputs
+* inconsistent states on disk
 
-./symfrog512 --help
+---
 
-Encrypt example:
+# 🧪 Tests
 
-./symfrog512 encrypt input.bin output.syf --password "pass" --ad
-"context"
+Run the full test suite:
 
-Decrypt example:
-
-./symfrog512 decrypt output.syf recovered.bin --password "pass" --ad
-"context"
-
-Raw key mode:
-
-./symfrog512 encrypt input.bin output.syf --raw-key HEXKEY
-
-# 14. Test Suite
-
-Run:
-
+```bash
 ./symfrog512 --test-all
+```
 
-Covers:
+Typical coverage includes:
 
--   Zero-length files\
--   Boundary sizes\
--   Large file sizes\
--   Wrong password detection\
--   Wrong key detection\
--   Tampered ciphertext\
--   Tampered header\
--   Truncation detection
+* size 0, 1, 2 bytes
+* boundary sizes around rate/padding points
+* large file tests
+* wrong password/key rejection
+* tampered ciphertext rejection
+* tampered header rejection
+* truncation rejection
 
-# 15. Structural Validation Tool
+If tests fail, it usually means:
 
-Optional Python inspection script validates:
+* missing deps
+* file permission issues
+* a regression in header/tag handling
+* incorrect build flags or ABI mismatch
 
--   Header structure\
--   Field consistency\
--   Tag placement\
--   Ciphertext length integrity
+---
 
-Does not decrypt data.
+# 🐍 Offline Structure Validation Tool
 
-# 16. Threat Model
+If you include the inspection script (recommended for debugging and reproducibility), it can verify:
 
-Protected:
+* magic/version
+* flags
+* header sizes
+* computed ciphertext length consistency
+* detection of truncated outputs
+* detection of duplicate nonces across artifacts
 
--   Passive attacker reading ciphertext\
--   Active attacker modifying ciphertext\
--   Offline brute force mitigated by Argon2id
+Example:
 
-Out of scope:
+```bash
+python3 tools/symfrog_inspect.py symfrog_test_out
+```
 
--   Compromised endpoint\
--   Malicious OS\
--   Physical memory extraction
+This does **not** decrypt. It validates structure and invariants.
 
-# 17. Cryptographic Rationale
+---
 
-Capacity 512 bits provides conservative internal margin.
+# 🛠 Build
 
-Tag 256 bits bounds forgery probability.
+## Dependencies
 
-Large state increases resistance to multi-target generic attacks.
+### Ubuntu / Debian
 
-Duplex construction avoids state exposure prior to finalization.
+```bash
+sudo apt update
+sudo apt install -y clang lld make pkg-config libsodium-dev libssl-dev python3
+```
 
-Header authentication prevents metadata manipulation.
+## Build with Clang + LLD (recommended)
 
-# 18. Performance
+```bash
+clang++ -std=c++20 -O3 -march=native -mtune=native -flto -fuse-ld=lld -pipe \
+  symfrog512.cpp -o symfrog512 \
+  -lsodium -lssl -lcrypto
+```
 
-Approximate values on modern x86_64:
+## Build with strict warnings (debug-friendly)
 
--   Sub-microsecond permutation latency\
--   Efficient streaming throughput\
--   Single-core optimized build
+```bash
+clang++ -std=c++20 -O2 -g -fno-omit-frame-pointer -fuse-ld=lld -pipe \
+  -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion -Wformat=2 \
+  symfrog512.cpp -o symfrog512 \
+  -lsodium -lssl -lcrypto
+```
 
-# 19. FAQ
+---
 
-Is this standardized\
-No
+# 🚀 Usage
 
-Is it stronger than AES-GCM\
-Not in terms of standardization maturity
+Because CLI flags can evolve, always check:
 
-Why 1024-bit state\
-Conservative margin and structural separation
+```bash
+./symfrog512 --help
+```
 
-# 20. Roadmap
+Typical flows:
 
-Planned improvements:
+## Encrypt a file
 
--   Formal specification document\
--   Published test vectors\
--   Reduced-round analysis\
--   CI reproducible builds\
--   Expanded benchmarking
+* choose password mode OR raw-key mode
+* optionally add AD
+* generate ciphertext `.syf`
 
-# 21. License
+## Decrypt a file
 
-MIT License
+* same password or key
+* same AD
 
-Copyright 2026 Victor Duarte Melo
+### Example workflow template
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files to deal in the
-Software without restriction.
+```bash
+# Encrypt
+./symfrog512 encrypt input.bin output.syf --password "your-passphrase" --ad "context"
+
+# Decrypt
+./symfrog512 decrypt output.syf recovered.bin --password "your-passphrase" --ad "context"
+```
+
+Raw key template:
+
+```bash
+./symfrog512 encrypt input.bin output.syf --raw-key <HEXKEY> --ad "context"
+./symfrog512 decrypt output.syf recovered.bin --raw-key <HEXKEY> --ad "context"
+```
+
+---
+
+# 📚 Threat Model
+
+SymFrog-512 aims to protect against:
+
+✅ Passive attackers
+
+* can read ciphertext
+* cannot decrypt without key
+
+✅ Active attackers
+
+* can tamper with ciphertext/header
+* should be detected with overwhelming probability
+
+✅ Offline brute force of passwords
+
+* mitigated by Argon2id KDF parameters
+
+Not guaranteed by design (out of scope):
+
+* compromised endpoints
+* keyloggers
+* malicious OS or RAM scraping
+* side-channel resistant constant-time proof for all paths (depends on platform/build)
+
+---
+
+# ⚠️ Common Pitfalls
+
+## Reusing nonce with the same key
+
+This is the fastest way to break stream-like designs.
+Do not do it.
+
+## Wrong AD
+
+AD must match. If AD differs, authentication must fail.
+
+## Changing the code breaks compatibility
+
+Round constants, header format, tag derivation are part of the protocol.
+If you change them, old ciphertext may become undecryptable.
+
+---
+
+# 🧩 FAQ
+
+### Is this “better than AES-GCM”?
+
+Not as a standardized primitive. AES-GCM is deeply analyzed and hardware accelerated.
+SymFrog-512 is for research and paranoid experimentation with a large sponge state.
+
+### Why 1024-bit state?
+
+A large state provides conservative security margin and makes many generic attacks impractical, especially in multi-target settings.
+
+### Is the cipher “proven secure”?
+
+No. Like almost all practical ciphers, it relies on structural assumptions plus analysis. The intended claims are conservative (256-bit target).
+
+### Can I use it in production?
+
+Only if you accept the risk of a non-standard primitive and conduct independent review. Use AES-GCM or ChaCha20-Poly1305 for standard production needs.
+
+---
+
+# 🗺 Roadmap
+
+Ideas for future versions:
+
+* More formal spec document (protocol + test vectors)
+* Known-answer tests (KAT) published in repo
+* Deterministic test vector generator
+* CI pipeline with reproducible builds
+* Side-channel review checklist
+* Additional platforms (aarch64)
+* Performance benchmarks and profiles
+
+---
+
+# 🤝 Contributing
+
+Contributions are welcome:
+
+* cryptanalysis notes
+* reduced-round analysis
+* differential/linear trail searches
+* fuzzing and robustness tests
+* portability improvements
+* documentation improvements
+
+Open an issue with:
+
+* build flags
+* OS + compiler version
+* reproduction steps
+* sample file if needed
+
+---
+
+# 📄 License
+
+**MIT License**
+See `LICENSE`.
+
+---
+
+# 🐸 Author
+
+**Victor Duarte Melo**
+Independent Research
+
+---
+
+## ✅ Quick Checklist
+
+* Download: ✅
+* Build: ✅
+* Test: ✅ (`--test-all`)
+* Encrypt: ✅
+* Decrypt: ✅
+* Validate structure: ✅
+* Package release: ✅
+* MIT: ✅
+
