@@ -1,0 +1,26 @@
+Test | Status | Note
+---|---|---
+Permutation Avalanche by Round | AUTOMATED | average final HD=513.320312
+Permutation SAC | AUTOMATED | average flip probability=0.498877
+Permutation BIC | AUTOMATED | avg |corr|=0.013499
+Permutation Bit Balance | AUTOMATED | max deviation from 0.5=0.059570
+Permutation Byte Frequency | AUTOMATED | chi-square=271.784180
+Permutation Linearity Distance | AUTOMATED | avg HD=512.255859
+Permutation Fixed/Near-Fixed Search | AUTOMATED | fixed=0 near_fixed<=8=0
+Permutation Short Cycle Smoke | AUTOMATED | cycle hits within window=0
+Permutation Zero Orbit | AUTOMATED | recorded 256 rounds from zero state
+Permutation Symmetry Smoke | AUTOMATED | complement HD=517 rotation HD=533
+Permutation Low-Weight Propagation | AUTOMATED | avg output weight=513.210938
+Permutation Integral Balance Smoke | AUTOMATED | 8-round integral-style XOR traces recorded
+Permutation Differential Smoke | AUTOMATED | tracked 16 one-bit input deltas
+Hash Determinism | AUTOMATED PASS | same message hashed twice
+Hash Avalanche | AUTOMATED | avg HD=255.814453
+Hash Bit Balance | AUTOMATED | max deviation from 0.5=0.038086
+Hash Byte Frequency | AUTOMATED | chi-square=246.242188
+Hash Collision Smoke (128-bit prefix) | AUTOMATED | prefix collisions across random set=0
+Hash Near-Collision Smoke | AUTOMATED | best observed HD=224
+Hash Second-Preimage Smoke | AUTOMATED | accidental matches=0
+AEAD Existing Self Tests | AUTOMATED PASS | reused upstream self-tests
+AEAD Nonce Reuse First-Block Demo | AUTOMATED | matching XOR bytes in first block=64/64
+AEAD Wrong AD/Key Matrix | AUTOMATED PASS | ok=1 bad_ad=0 bad_key=0
+Existing Benchmarks | AUTOMATED | ran upstream permutation+AEAD benchmarks

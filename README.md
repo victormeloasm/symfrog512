@@ -1,485 +1,267 @@
 # 🐸 SymFrog-512
 
-## High-Capacity Sponge-Based AEAD Cipher (1024-bit State)
+**Experimental sponge-duplex AEAD with a 1024-bit state**
 
 <p align="center">
-  <img src="assets/logo.png" width="320" alt="SymFrog-512 Logo">
+  <img src="assets/logo.png" width="320" alt="SymFrog-512 logo">
 </p>
 
-<p align="center">
-  <b>SymFrog-512</b> is a sponge-duplex authenticated encryption design built around a 1024-bit internal state, engineered for conservative margins, file safety, and practical usability.
-</p>
-
-<p align="center">
-  <a href="https://github.com/victormeloasm/symfrog512/releases/tag/v1.0">Release v1.0</a>
-  ·
-  <a href="#-download">Download</a>
-  ·
-  <a href="#-build">Build</a>
-  ·
-  <a href="#-usage">Usage</a>
-  ·
-  <a href="#-security-model--claims">Security</a>
-</p>
-
----
-
-## ⭐ Highlights
-
-* 🔐 **AEAD (Authenticated Encryption with Associated Data)** for files and streams
-* 🧽 **Sponge Duplex** with **1024-bit state** (rate 512, capacity 512)
-* 🏷️ **256-bit authentication tag**
-* 🧂 **Salt + Argon2id** password-based key derivation mode
-* 🔑 **Raw-key mode** for high-entropy keys
-* 🧾 **Authenticated header** to protect metadata integrity before decrypting
-* 💾 **Atomic, crash-safe file writes** (tmp → fsync → rename)
-* 🧠 **Secure memory handling** (`sodium_mlock`, explicit zeroization)
-* 🧪 **`--test-all`** suite with boundary, tamper, truncation and large-size coverage
-* 🐍 Optional offline inspection tooling (header + structure validation)
-
----
-
-# 📦 Download
-
-✅ Prebuilt Linux x86_64 binary release:
-
-**[https://github.com/victormeloasm/symfrog512/releases/download/v1.0/symfrog512-linux-x86_64.tar.gz](https://github.com/victormeloasm/symfrog512/releases/download/v1.0/symfrog512-linux-x86_64.tar.gz)**
-
-Extract:
-
-```bash
-tar -xzf symfrog512-linux-x86_64.tar.gz
-chmod +x symfrog512
-./symfrog512 --help
-```
-
----
-
-# 🧠 What SymFrog-512 Is (and Is Not)
-
-SymFrog-512 is a **research-grade** cipher implementation focusing on:
-
-* large internal state
-* conservative separation of rate/capacity
-* authenticated file format
-* durable file writes
-* clarity and reproducibility
-
-It is not a standardized primitive (like AES-GCM or ChaCha20-Poly1305).
-It is meant for research, experimentation, and transparent engineering.
-
----
-
-# 🧽 Design Overview
-
-## Sponge Duplex Construction
-
-SymFrog-512 uses a duplex sponge approach:
-
-* data is absorbed into the state
-* state is permuted
-* output keystream/tag is derived from the state
-
-The internal state is split into two conceptual parts:
-
-* **Rate (r)**: the part that interacts with plaintext/ciphertext and AD
-* **Capacity (c)**: the hidden security margin that is never directly exposed
-
-### Parameters
-
-* **State size**: 1024 bits
-* **Rate**: 512 bits
-* **Capacity**: 512 bits
-* **Rounds**: 24
-* **Nonce**: 256 bits
-* **Tag**: 256 bits
-
----
-
-# 🔐 Security Model & Claims
-
-## Practical security level
-
-SymFrog-512 targets:
-
-* **Up to 256-bit effective security** against generic AEAD forgery and confidentiality attacks
-* **2⁻²⁵⁶** generic forgery probability from a 256-bit tag (best-case bound)
-
-### Why not “512-bit real security”?
-
-Even with 512-bit capacity, **AEAD security is bounded by the tag size** and generic birthday-style limits in realistic attack models.
-
-So the honest, paper-grade claim is:
-
-* **Confidentiality and authenticity target: 256-bit**, assuming the permutation behaves as a secure PRP and nonces are not reused with the same key.
-
-This is already far beyond conventional deployment needs (AES-256 is generally “enough for the universe”).
-
----
-
-# 🧱 P1024 Permutation Engine
-
-SymFrog-512’s core permutation runs for **24 rounds**.
-
-Each round is structured to provide:
-
-* high diffusion across the entire 1024-bit state
-* strong non-linearity
-* symmetry breaking
-* avoidance of trivial invariants
-* deterministic, reproducible constants
-
-### Round constants
-
-Round constants are derived deterministically via SHAKE256 to prevent:
-
-* weak constants
-* accidental symmetry
-* hidden “handpicked” constants concerns
-
----
-
-# 🧾 File Format (On-Disk)
-
-SymFrog-512 stores ciphertexts in a file container with an authenticated header.
-
-### High-level structure
-
-```
-+----------------------------+
-| Header (fixed size)        |
-|  magic, version, flags     |
-|  salt (optional)           |
-|  nonce                     |
-|  ct_len                    |
-|  reserved                  |
-|  header_tag (256-bit)      |
-+----------------------------+
-| Ciphertext (ct_len bytes)  |
-+----------------------------+
-| Final Tag (256-bit)        |
-+----------------------------+
-```
-
-### Why an authenticated header?
-
-It prevents attacks where an adversary modifies metadata (nonce, salt, flags, length, version) to force:
-
-* undefined behavior
-* oracle-like error leaks
-* confusion about parameters
-* downgrade or cross-file substitution
-
-In SymFrog, the header is cryptographically bound before decryption proceeds.
-
----
-
-# 🧷 Associated Data (AD)
-
-Associated Data is authenticated but not encrypted.
-
-Use cases:
-
-* filenames
-* protocol metadata
-* file-type identifiers
-* user IDs
-* structured context
-
-If AD changes, decryption must fail.
-
----
-
-# 🔑 Key Modes & Guidance
-
-SymFrog supports:
-
-## Password mode (Argon2id)
-
-* Designed for human passphrases
-* Uses a salt stored in the header
-* Provides memory-hard defense against offline guessing
-
-✅ Best for usability.
-
-## Raw-key mode
-
-* For high-entropy keys (generated, not typed)
-* Useful for automation, CI, or key vaults
-* Avoids KDF cost
-
-✅ Best for controlled environments.
-
----
-
-# 🧨 Nonce Guidance (Important)
-
-Nonce must be **unique per encryption under the same key**.
-
-* Password mode: salts differ per file, which reduces same-key reuse risk, but you still should not intentionally reuse nonce with identical derived keys.
-* Raw-key mode: treat nonce uniqueness as mandatory.
-
-The test harness may use deterministic nonce values (for reproducibility).
-That is normal in tests, not in production usage.
-
----
-
-# 💾 Atomic File Safety & Reliability
-
-Encryption output is written using a safe sequence:
-
-1. write to temp file in the destination directory
-2. flush with `fsync`
-3. atomically rename to final filename
-
-This prevents:
-
-* corrupted ciphertext on crash/power loss
-* half-written outputs
-* inconsistent states on disk
-
----
-
-# 🧪 Tests
-
-Run the full test suite:
-
-```bash
-./symfrog512 --test-all
-```
-
-Typical coverage includes:
-
-* size 0, 1, 2 bytes
-* boundary sizes around rate/padding points
-* large file tests
-* wrong password/key rejection
-* tampered ciphertext rejection
-* tampered header rejection
-* truncation rejection
-
-If tests fail, it usually means:
-
-* missing deps
-* file permission issues
-* a regression in header/tag handling
-* incorrect build flags or ABI mismatch
-
----
-
-# 🐍 Offline Structure Validation Tool
-
-If you include the inspection script (recommended for debugging and reproducibility), it can verify:
-
-* magic/version
-* flags
-* header sizes
-* computed ciphertext length consistency
-* detection of truncated outputs
-* detection of duplicate nonces across artifacts
-
-Example:
-
-```bash
-python3 tools/symfrog_inspect.py symfrog_test_out
-```
-
-This does **not** decrypt. It validates structure and invariants.
-
----
-
-# 🛠 Build
+SymFrog-512 is a research implementation of authenticated file encryption built around the custom **P1024-v2** permutation. The current code writes the **hardened file format v2** and retains read compatibility with legacy v1 files.
+
+> **Important:** SymFrog-512 is a non-standard, independently designed primitive. It has not received the depth of public cryptanalysis enjoyed by AES-GCM, ChaCha20-Poly1305, or Ascon. Use a standardized AEAD for production systems unless an independent review explicitly accepts this risk.
+
+## Current parameters
+
+| Parameter | Value |
+|---|---:|
+| Permutation state | 1024 bits |
+| Rate / capacity | 512 / 512 bits |
+| Rounds | 24 |
+| Raw key | 1024 bits (128 bytes) |
+| Nonce | 256 bits (32 bytes) |
+| Final tag | 256 bits (32 bytes) |
+| Stored password salt | 256 bits (32 bytes) |
+| File header | 152 bytes |
+
+The large state and tag are conservative parameters, not proof of a particular real-world security level. Security still depends on the structure of P1024-v2, the duplex mode, implementation correctness, nonce discipline, and independent analysis.
+
+## Hardened format v2
+
+New encryptions use header version `0x00000002`. Major changes from legacy v1:
+
+- protocol-version separation is injected into the initial state;
+- the final padded ciphertext block receives explicit `DS_CT` domain separation;
+- all 32 stored salt bytes are committed into the effective Argon2id salt;
+- the Argon2id profile is stored in the authenticated header, with explicit opt-in required before honoring SENSITIVE memory cost;
+- unknown flags, malformed KDF metadata, non-zero unused fields, and length mismatches are rejected;
+- decryption authenticates the full ciphertext **before creating plaintext output** and verifies it again during the decryption pass;
+- input symlinks are rejected with `O_NOFOLLOW`;
+- existing outputs are not replaced unless `--force` is supplied;
+- passphrases can be read from `/dev/tty` or a protected file instead of appearing in process arguments;
+- secret files must have mode `0600` or stricter;
+- all-zero raw keys are rejected;
+- deterministic nonce overrides require an explicit unsafe-use acknowledgement.
+
+Legacy v1 decryption is preserved. v1 password files did not encode their Argon2id profile, so `--paranoid` must still be supplied when decrypting a v1 file originally created with the historical SENSITIVE profile.
 
 ## Dependencies
 
-### Ubuntu / Debian
+Ubuntu / Debian:
 
 ```bash
 sudo apt update
 sudo apt install -y clang lld make pkg-config libsodium-dev libssl-dev python3
 ```
 
-## Build with Clang + LLD (recommended)
+## Build
+
+The repository includes a `Makefile`.
 
 ```bash
-clang++ -std=c++20 -O3 -march=native -mtune=native -flto -fuse-ld=lld -pipe \
-  symfrog512.cpp -o symfrog512 \
-  -lsodium -lssl -lcrypto
+make release
 ```
 
-## Build with strict warnings (debug-friendly)
+CPU-specific optimized build:
 
 ```bash
-clang++ -std=c++20 -O2 -g -fno-omit-frame-pointer -fuse-ld=lld -pipe \
+make native
+```
+
+Debug and sanitizer builds:
+
+```bash
+make debug
+make sanitize
+```
+
+Manual release build:
+
+```bash
+clang++ -std=c++23 -O3 -flto -fuse-ld=lld -fno-rtti \
+  -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS \
+  -fstack-protector-strong -fstack-clash-protection -fPIE \
   -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion -Wformat=2 \
-  symfrog512.cpp -o symfrog512 \
-  -lsodium -lssl -lcrypto
+  src/symfrog512.cpp -o symfrog512 \
+  -pie -Wl,-z,relro,-z,now -Wl,-z,noexecstack \
+  -lsodium -lcrypto
 ```
 
----
+The program uses C++ exceptions. Do **not** compile it with `-fno-exceptions`.
 
-# 🚀 Usage
+## Recommended usage
 
-Because CLI flags can evolve, always check:
+### Password mode
+
+Prompt securely through `/dev/tty`:
 
 ```bash
-./symfrog512 --help
+./symfrog512 enc secret.bin secret.syf --pass-prompt
+./symfrog512 dec secret.syf recovered.bin --pass-prompt
 ```
 
-Typical flows:
+The encryption prompt asks twice for confirmation. The passphrase is not echoed.
 
-## Encrypt a file
-
-* choose password mode OR raw-key mode
-* optionally add AD
-* generate ciphertext `.syf`
-
-## Decrypt a file
-
-* same password or key
-* same AD
-
-### Example workflow template
+A passphrase file is also supported:
 
 ```bash
-# Encrypt
-./symfrog512 encrypt input.bin output.syf --password "your-passphrase" --ad "context"
-
-# Decrypt
-./symfrog512 decrypt output.syf recovered.bin --password "your-passphrase" --ad "context"
+chmod 600 passphrase.txt
+./symfrog512 enc secret.bin secret.syf --pass-file passphrase.txt
+./symfrog512 dec secret.syf recovered.bin --pass-file passphrase.txt
 ```
 
-Raw key template:
+One trailing LF and optional CR are stripped. An empty passphrase is rejected.
+
+Use the SENSITIVE Argon2id profile for a new file:
 
 ```bash
-./symfrog512 encrypt input.bin output.syf --raw-key <HEXKEY> --ad "context"
-./symfrog512 decrypt output.syf recovered.bin --raw-key <HEXKEY> --ad "context"
+./symfrog512 enc secret.bin secret.syf --pass-prompt --paranoid
 ```
 
----
+The selected profile is stored in the authenticated v2 header. Because that metadata cannot be authenticated until after key derivation, decrypting a file that requests the SENSITIVE profile requires an explicit `--paranoid` opt-in. This prevents an attacker-controlled header from silently forcing the highest-memory KDF.
 
-# 📚 Threat Model
+```bash
+./symfrog512 dec secret.syf recovered.bin --pass-prompt --paranoid
+```
 
-SymFrog-512 aims to protect against:
+### Raw-key mode
 
-✅ Passive attackers
+Generate a 128-byte key and protect it carefully:
 
-* can read ciphertext
-* cannot decrypt without key
+```bash
+umask 077
+head -c 128 /dev/urandom > symfrog.key
+./symfrog512 enc secret.bin secret.syf --key-file symfrog.key
+./symfrog512 dec secret.syf recovered.bin --key-file symfrog.key
+```
 
-✅ Active attackers
+`--key-file` accepts either exactly 128 raw bytes or exactly 256 hexadecimal characters, with surrounding whitespace ignored in hex mode. Secret files must be mode `0600` or stricter, and an all-zero raw key is rejected as a likely initialization mistake.
 
-* can tamper with ciphertext/header
-* should be detected with overwhelming probability
 
-✅ Offline brute force of passwords
+### Deterministic nonce override
 
-* mitigated by Argon2id KDF parameters
+Normal encryption generates a fresh random 256-bit nonce. `--nonce-hex` exists only for reproducible test vectors and is deliberately gated:
 
-Not guaranteed by design (out of scope):
+```bash
+./symfrog512 enc input.bin vector.syf --key-file symfrog.key \
+  --nonce-hex 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f \
+  --allow-unsafe-nonce
+```
 
-* compromised endpoints
-* keyloggers
-* malicious OS or RAM scraping
-* side-channel resistant constant-time proof for all paths (depends on platform/build)
+Never reuse a nonce with the same key. Nonce reuse can reveal XOR relations between plaintexts and invalidates the intended confidentiality guarantees.
 
----
+### Associated data
 
-# ⚠️ Common Pitfalls
+Associated data is hexadecimal and must match during decryption:
 
-## Reusing nonce with the same key
+```bash
+./symfrog512 enc secret.bin secret.syf --pass-prompt --ad 486561646572
+./symfrog512 dec secret.syf recovered.bin --pass-prompt --ad 486561646572
+```
 
-This is the fastest way to break stream-like designs.
-Do not do it.
+### Output replacement
 
-## Wrong AD
+SymFrog refuses to overwrite an existing output by default:
 
-AD must match. If AD differs, authentication must fail.
+```bash
+./symfrog512 dec secret.syf recovered.bin --pass-prompt --force
+```
 
-## Changing the code breaks compatibility
+`--force` performs an atomic replacement after the new output is completely written and synchronized.
 
-Round constants, header format, tag derivation are part of the protocol.
-If you change them, old ciphertext may become undecryptable.
+### Legacy argv options
 
----
+`--pass` and `--key-hex` remain for compatibility, but they may leak secrets through shell history, `/proc`, process monitors, logs, or crash reports. Prefer `--pass-prompt`, `--pass-file`, and `--key-file`.
 
-# 🧩 FAQ
+## File layout
 
-### Is this “better than AES-GCM”?
+```text
+magic[8] | version[4] | flags[4] | salt[32] | nonce[32]
+ct_len[8] | reserved[32] | header_tag[32]
+ciphertext[ct_len] | final_tag[32]
+```
 
-Not as a standardized primitive. AES-GCM is deeply analyzed and hardware accelerated.
-SymFrog-512 is for research and paranoid experimentation with a large sponge state.
+All integers are little-endian. The header tag authenticates the complete header with its tag field zeroed, plus external associated data.
 
-### Why 1024-bit state?
+For v2 password files, `reserved` is:
 
-A large state provides conservative security margin and makes many generic attacks impractical, especially in multi-target settings.
+```text
+"KDF2" | profile[1] | zero[27]
+```
 
-### Is the cipher “proven secure”?
+Profiles currently accepted:
 
-No. Like almost all practical ciphers, it relies on structural assumptions plus analysis. The intended claims are conservative (256-bit target).
+- `1`: libsodium Argon2id MODERATE
+- `2`: libsodium Argon2id SENSITIVE
 
-### Can I use it in production?
+Raw-key files require both `salt` and `reserved` to be all-zero.
 
-Only if you accept the risk of a non-standard primitive and conduct independent review. Use AES-GCM or ChaCha20-Poly1305 for standard production needs.
+## Tests
 
----
+Built-in regression and tamper tests:
 
-# 🗺 Roadmap
+```bash
+./symfrog512 --test-all
+```
 
-Ideas for future versions:
+The suite covers boundary sizes, password and raw-key round trips, wrong key/password, wrong AD, header/ciphertext/tag tampering, and truncation.
 
-* More formal spec document (protocol + test vectors)
-* Known-answer tests (KAT) published in repo
-* Deterministic test vector generator
-* CI pipeline with reproducible builds
-* Side-channel review checklist
-* Additional platforms (aarch64)
-* Performance benchmarks and profiles
+Extended experimental suite:
 
----
+```bash
+make full-suite
+./symfrog_full_suite
+```
 
-# 🤝 Contributing
+Sanitizer run:
 
-Contributions are welcome:
+```bash
+make sanitize
+ASAN_OPTIONS=detect_leaks=1 ./symfrog512-sanitize --test-all
+```
 
-* cryptanalysis notes
-* reduced-round analysis
-* differential/linear trail searches
-* fuzzing and robustness tests
-* portability improvements
-* documentation improvements
+## Offline inspector
 
-Open an issue with:
+```bash
+python3 src/symfrog_inspect.py path/to/files
+python3 src/symfrog_inspect.py --json report.json path/to/files
+```
 
-* build flags
-* OS + compiler version
-* reproduction steps
-* sample file if needed
+The inspector recognizes v1 and v2, checks structural invariants, and reports visible nonce-reuse risk groups. It does **not** possess the key and therefore cannot authenticate or decrypt a file.
 
----
+## Security model and limitations
 
-# 📄 License
+SymFrog aims to provide confidentiality and ciphertext integrity when:
 
-**MIT License**
-See `LICENSE`.
+- P1024-v2 behaves as a secure permutation for this mode;
+- a nonce is never reused under the same raw or derived key;
+- keys and passphrases remain secret;
+- the endpoint and operating system are trustworthy;
+- implementation and compiler behavior do not introduce exploitable side channels.
 
----
+It does not protect against endpoint compromise, keyloggers, malicious kernels, RAM acquisition, rollback attacks on external storage, weak human passphrases, or cryptanalytic weaknesses in the custom permutation.
 
-# 🐸 Author
+The empirical avalanche tests are sanity checks only. They are not cryptographic proofs. Likewise, ideal-permutation bounds do not establish that P1024-v2 itself behaves ideally.
 
-**Victor Duarte Melo**
-Independent Research
+## Compatibility
 
----
+- New encryption: format v2 only.
+- Decryption: format v1 and v2.
+- The v2 transcript differs intentionally, so v1 and v2 ciphertexts are not byte-compatible.
+- Do not modify round constants, state layout, padding, domain constants, or extraction rules without defining a new protocol version and publishing new known-answer vectors.
 
-## ✅ Quick Checklist
+## Files
 
-* Download: ✅
-* Build: ✅
-* Test: ✅ (`--test-all`)
-* Encrypt: ✅
-* Decrypt: ✅
-* Validate structure: ✅
-* Package release: ✅
-* MIT: ✅
+- `src/symfrog512.cpp`: reference implementation and built-in tests
+- `src/symfrog_full_suite.cpp`: extended statistical and robustness experiments
+- `src/symfrog_inspect.py`: offline structural inspector
+- `SECURITY.md`: security posture and reporting guidance
+- `CHANGELOG.md`: changes from legacy v1
 
+## License
+
+MIT. See `LICENSE`.
+
+## Author
+
+**Victor Duarte Melo**  
+Independent Researcher
