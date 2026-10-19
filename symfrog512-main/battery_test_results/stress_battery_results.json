@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "counts": {
+    "processes": 3049,
+    "roundtrip_sizes": 215,
+    "hash_determinism": 215,
+    "nonce_and_key_controls": 6,
+    "v5_related_key_nonce_rejection": 1,
+    "all_byte_tamper_rejections": 441,
+    "truncation_rejections": 16,
+    "mutational_fuzz_rejections": 1200,
+    "filesystem_rejections": 4,
+    "malformed_key_rejections": 5,
+    "hash_avalanche_pairs": 256
+  },
+  "notes": [
+    "V5_RELATED_KEY_NONCE: XOR-compensated key/nonce pair has distinct ciphertext and tag; former v3 identity not observed.",
+    "HASH_AVALANCHE_256_PAIRS: mean HD=256.969/512, min=225, max=284, sample_sd=11.289. Exploratory only."
+  ],
+  "wall_seconds": 10.58,
+  "source_sha256": "f70962f7b4dc027c72a19d98386715e8fe218acec376344343cfc04d8a99b36e"
+}

@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "counts": {
+    "build_equivalence_cases": 12,
+    "fragmentation_cases": 63,
+    "sanitizer_cases": 13,
+    "password_cases": 2
+  }
+}

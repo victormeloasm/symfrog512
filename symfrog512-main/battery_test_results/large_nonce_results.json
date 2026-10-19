@@ -1,0 +1,8 @@
+{
+  "large_file_bytes": 33554497,
+  "roundtrip_seconds": 0.842,
+  "distinct_nonce_trials": 1000,
+  "unique_nonces": 1000,
+  "unique_ciphertexts_and_tags": 1000,
+  "status": "PASS"
+}

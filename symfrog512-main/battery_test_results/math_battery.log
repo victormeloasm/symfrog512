@@ -1,0 +1,5 @@
+PASS chi_sbox_unique=16 ddt_max=4 lat_max_abs=8
+PASS per_layer_inverse_checks=150000
+PASS full_permutation_inverse_checks=52048
+PASS permutation_one_bit_avalanche_samples=8000 mean_hd=512.154125 min=460 max=577 sd=15.825995 max_bit_position_deviation=0.018875
+PASS legacy_v3_related_pair_equal=true v5_related_pair_equal=false
